@@ -258,6 +258,9 @@ function getOrCreatePeer(peerId) {
   const pendingCandidates = [];
   const videoTransceiver = pc.addTransceiver("video", { direction: "sendrecv" });
   const videoSender = videoTransceiver.sender;
+  const polite = Boolean(you?.id) ? String(you.id) < String(peerId) : true;
+  let makingOffer = false;
+  let ignoreOffer = false;
 
   pc.onicecandidate = (event) => {
     if (event.candidate && socket) {
@@ -268,8 +271,15 @@ function getOrCreatePeer(peerId) {
     }
   };
 
+  pc.onnegotiationneeded = () => {
+    createOffer(peerId).catch(() => {});
+  };
+
   pc.ontrack = (event) => {
-    if (event.track) remoteStream.addTrack(event.track);
+    if (event.track) {
+      const exists = remoteStream.getTracks().some((t) => t.id === event.track.id);
+      if (!exists) remoteStream.addTrack(event.track);
+    }
     const tile = ensureRemoteTile(peerId);
     const video = tile.querySelector("video");
     if (video && video.srcObject !== remoteStream) {
@@ -290,7 +300,25 @@ function getOrCreatePeer(peerId) {
     } catch {}
   }
 
-  entry = { pc, remoteStream, pendingCandidates, videoSender };
+  entry = {
+    pc,
+    remoteStream,
+    pendingCandidates,
+    videoSender,
+    polite,
+    get makingOffer() {
+      return makingOffer;
+    },
+    set makingOffer(val) {
+      makingOffer = Boolean(val);
+    },
+    get ignoreOffer() {
+      return ignoreOffer;
+    },
+    set ignoreOffer(val) {
+      ignoreOffer = Boolean(val);
+    }
+  };
   peers.set(peerId, entry);
   return entry;
 }
@@ -308,23 +336,35 @@ async function flushCandidates(peerId) {
 }
 
 async function createOffer(peerId) {
+  if (!socket) return;
   const entry = getOrCreatePeer(peerId);
-  const offer = await entry.pc.createOffer();
-  await entry.pc.setLocalDescription(offer);
-  socket.emit("webrtc-offer", { to: peerId, sdp: entry.pc.localDescription });
+  if (entry.makingOffer) return;
+  if (entry.pc.signalingState !== "stable") return;
+
+  entry.makingOffer = true;
+  try {
+    await entry.pc.setLocalDescription(await entry.pc.createOffer());
+    socket.emit("webrtc-offer", { to: peerId, sdp: entry.pc.localDescription });
+  } finally {
+    entry.makingOffer = false;
+  }
 }
 
 async function handleOffer(from, sdp) {
   const entry = getOrCreatePeer(from);
+  const offerCollision = entry.makingOffer || entry.pc.signalingState !== "stable";
+  entry.ignoreOffer = !entry.polite && offerCollision;
+  if (entry.ignoreOffer) return;
+
   await entry.pc.setRemoteDescription(sdp);
   await flushCandidates(from);
-  const answer = await entry.pc.createAnswer();
-  await entry.pc.setLocalDescription(answer);
+  await entry.pc.setLocalDescription(await entry.pc.createAnswer());
   socket.emit("webrtc-answer", { to: from, sdp: entry.pc.localDescription });
 }
 
 async function handleAnswer(from, sdp) {
   const entry = getOrCreatePeer(from);
+  if (entry.ignoreOffer) return;
   await entry.pc.setRemoteDescription(sdp);
   await flushCandidates(from);
 }
@@ -378,6 +418,12 @@ async function replaceVideoTrackForAll(newTrack) {
   }
 }
 
+function renegotiateAll() {
+  for (const peerId of peers.keys()) {
+    createOffer(peerId).catch(() => {});
+  }
+}
+
 async function enableCamera() {
   if (camEnabled) return;
 
@@ -403,6 +449,7 @@ async function enableCamera() {
     await replaceVideoTrackForAll(cameraVideoTrack);
   }
 
+  renegotiateAll();
   updateLocalPreview();
   setButtons();
 }
@@ -426,6 +473,7 @@ async function disableCamera() {
     await replaceVideoTrackForAll(null);
   }
 
+  renegotiateAll();
   updateLocalPreview();
   setButtons();
 }
@@ -454,6 +502,7 @@ async function startScreenShare() {
   });
 
   await replaceVideoTrackForAll(screenTrack);
+  renegotiateAll();
 
   const tile = videoGrid.querySelector(`.tile[data-tile="local"]`);
   if (tile) {
@@ -482,6 +531,7 @@ async function stopScreenShare() {
   } else {
     await replaceVideoTrackForAll(null);
   }
+  renegotiateAll();
 
   updateLocalPreview();
   const tile = videoGrid.querySelector(`.tile[data-tile="local"]`);
