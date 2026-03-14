@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genel Oda</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="room-title">Genel Oda</div>
+          <div class="room-subtitle" id="roomToken"></div>
+        </div>
+        <div class="topbar-actions">
+          <button id="btnMic" class="btn">Mikrofon Kapat</button>
+          <button id="btnCam" class="btn">Kamera Aç</button>
+          <button id="btnShare" class="btn btn-primary">Ekran Paylaş</button>
+          <button id="btnStopShare" class="btn btn-danger" disabled>
+            Paylaşımı Durdur
+          </button>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="left">
+          <div class="video-grid" id="videoGrid">
+            <div class="tile" data-tile="local">
+              <div class="tile-header">
+                <span class="tile-name" id="localName">Sen</span>
+                <span class="tile-badge" id="localBadges"></span>
+              </div>
+              <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+          </div>
+        </section>
+
+        <aside class="right">
+          <div class="panel-header">Ayarlar</div>
+          <div class="settings">
+            <div class="setting">
+              <div class="setting-label">Kullanıcı adı</div>
+              <div class="setting-controls">
+                <input id="settingsName" type="text" maxlength="24" />
+                <button id="btnSaveName" class="btn btn-primary">Kaydet</button>
+              </div>
+              <div class="setting-help" id="settingsHelp"></div>
+            </div>
+          </div>
+          <div class="panel-header">Katılımcılar</div>
+          <div class="user-list" id="userList"></div>
+        </aside>
+      </main>
+
+      <section class="chat">
+        <div class="messages" id="messages"></div>
+        <form id="chatForm" class="chat-input">
+          <input
+            id="chatText"
+            type="text"
+            placeholder="Mesaj yaz..."
+            autocomplete="off"
+          />
+          <button type="submit" class="btn btn-primary">Gönder</button>
+        </form>
+      </section>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <div class="card">
+        <h1>Genel Oda</h1>
+        <p class="muted" id="overlayHint"></p>
+        <form id="joinForm" class="join-form">
+          <label for="username">Kullanıcı Adı</label>
+          <input id="username" type="text" maxlength="24" required />
+          <button type="submit" class="btn btn-primary">Katıl</button>
+        </form>
+        <div class="error" id="overlayError"></div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
