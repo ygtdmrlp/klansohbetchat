@@ -1,0 +1,11 @@
+{
+  "name": "Genel Oda",
+  "short_name": "Genel Oda",
+  "description": "Tek odalı Discord benzeri sesli/görüntülü sohbet ve ekran paylaşımı.",
+  "start_url": "/?room=arkadaslar",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#313338",
+  "theme_color": "#1e1f22",
+  "orientation": "portrait"
+}

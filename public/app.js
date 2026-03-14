@@ -1,4 +1,6 @@
 const roomParam = new URLSearchParams(location.search).get("room");
+const DEFAULT_ROOM = "arkadaslar";
+const activeRoom = isValidRoomToken(roomParam) ? roomParam : DEFAULT_ROOM;
 
 const overlay = document.getElementById("overlay");
 const overlayHint = document.getElementById("overlayHint");
@@ -662,20 +664,19 @@ chatForm.addEventListener("submit", (e) => {
 });
 
 function initJoinUI() {
-  if (!isValidRoomToken(roomParam)) {
-    showOverlayHint("Davet linki geçersiz. Örn: /?room=arkadaslar");
-    joinForm.querySelector("button").disabled = true;
-    setOverlayError("room parametresi gerekli.");
-    return;
+  if (activeRoom !== roomParam) {
+    const url = new URL(location.href);
+    url.searchParams.set("room", activeRoom);
+    history.replaceState(null, "", url.toString());
   }
 
-  showOverlayHint(`Davet tokeni: ${roomParam}`);
-  roomTokenEl.textContent = `Davet: ?room=${roomParam}`;
-  const stored = getStoredUsername(roomParam);
+  showOverlayHint(`Davet tokeni: ${activeRoom}`);
+  roomTokenEl.textContent = `Davet: ?room=${activeRoom}`;
+  const stored = getStoredUsername(activeRoom);
   if (stored) {
     usernameInput.value = stored;
     if (settingsNameInput) settingsNameInput.value = stored;
-    joinWithUsername(stored, roomParam, true);
+    joinWithUsername(stored, activeRoom, true);
     return;
   }
 
@@ -704,14 +705,17 @@ async function joinWithUsername(username, room, auto) {
   }
 
   socket = io({
+    autoConnect: false,
     auth: {
       room,
       username: cleanUsername
     }
   });
 
-  hideOverlay();
   attachSocketHandlers(room);
+  socket.connect();
+
+  hideOverlay();
 }
 
 joinForm.addEventListener("submit", (e) => {
@@ -724,13 +728,13 @@ joinForm.addEventListener("submit", (e) => {
     return;
   }
 
-  const room = roomParam;
+  const room = activeRoom;
   joinWithUsername(username, room, false);
 });
 
 btnSaveName.addEventListener("click", (e) => {
   e.preventDefault();
-  if (!isValidRoomToken(roomParam)) return;
+  if (!isValidRoomToken(activeRoom)) return;
   const next = sanitizeName(settingsNameInput.value);
   if (!next) {
     settingsHelp.textContent = "Geçerli bir kullanıcı adı yaz.";
@@ -738,7 +742,7 @@ btnSaveName.addEventListener("click", (e) => {
   }
 
   settingsHelp.textContent = "";
-  setStoredUsername(roomParam, next);
+  setStoredUsername(activeRoom, next);
   setLocalUsername(next);
 
   if (socket) {
