@@ -284,6 +284,9 @@ function getOrCreatePeer(peerId) {
     const video = tile.querySelector("video");
     if (video && video.srcObject !== remoteStream) {
       video.srcObject = remoteStream;
+      try {
+        Promise.resolve(video.play()).catch(() => {});
+      } catch {}
     }
   };
 
@@ -352,19 +355,27 @@ async function createOffer(peerId) {
 
 async function handleOffer(from, sdp) {
   const entry = getOrCreatePeer(from);
-  const offerCollision = entry.makingOffer || entry.pc.signalingState !== "stable";
+  const isOffer = sdp?.type === "offer";
+  const offerCollision = isOffer && (entry.makingOffer || entry.pc.signalingState !== "stable");
   entry.ignoreOffer = !entry.polite && offerCollision;
   if (entry.ignoreOffer) return;
 
+  if (offerCollision) {
+    try {
+      await entry.pc.setLocalDescription({ type: "rollback" });
+    } catch {}
+  }
+
   await entry.pc.setRemoteDescription(sdp);
   await flushCandidates(from);
-  await entry.pc.setLocalDescription(await entry.pc.createAnswer());
-  socket.emit("webrtc-answer", { to: from, sdp: entry.pc.localDescription });
+  if (isOffer) {
+    await entry.pc.setLocalDescription(await entry.pc.createAnswer());
+    socket.emit("webrtc-answer", { to: from, sdp: entry.pc.localDescription });
+  }
 }
 
 async function handleAnswer(from, sdp) {
   const entry = getOrCreatePeer(from);
-  if (entry.ignoreOffer) return;
   await entry.pc.setRemoteDescription(sdp);
   await flushCandidates(from);
 }
