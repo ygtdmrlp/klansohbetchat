@@ -8,10 +8,15 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "dependencies": {
     "express": "^4.21.2",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.74.0"
   }
 }
